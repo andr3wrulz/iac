@@ -1,0 +1,53 @@
+- name: Playbook to setup all hosts for use with ansible
+  hosts: all
+  become: true
+
+  vars_files:
+    - vault.yml
+
+  pre_tasks:
+    - name: Ensure required variables are set
+      assert:
+        that:
+          - vault.common.ansible_user is defined
+          - vault.common.ansible_password is defined
+
+  tasks:
+    - name: Create an admin group
+      group:
+        name: admins
+        state: present
+
+    - name: Add passwordless sudo to the admin group
+      copy:
+        content: "%admins ALL=(ALL:ALL) NOPASSWD:ALL"
+        dest: /etc/sudoers.d/admins_nopasswd
+        mode: 0440
+        owner: root
+
+    - name: Create the ansible user
+      user:
+        name: "{{ vault.common.ansible_user }}"
+        groups: admins
+
+    - name: Install git, python and pip
+      yum:
+        name:
+          - git
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Try and install ansible
+      yum:
+        name: ansible
+        enablerepo: epel-release
+        state: present
+      ignore_errors: true
+      register: ansible_install
+
+    - name: If ansible failed to install, use pip to install it
+      when: ansible_install | failed
+      pip:
+        name: ansible
+        state: present

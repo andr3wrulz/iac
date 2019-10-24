@@ -1,0 +1,5 @@
+- name: Ansible playbook to stand up TICK Stack server
+  host: tick
+  
+  tasks:
+    -
