@@ -1,0 +1,29 @@
+- name: Install the Telegraf package
+  yum:
+    name: telegraf
+    state: present
+
+- name: Start the telegraf service
+  service:
+    service: telegraf
+    state: started
+
+# Wish there was a better way to do this but because it is in ini-like
+# file with miles of commented out options, I couldn't think of anything.
+- name: Add the credentials for InfluxDB to the Telegraf config
+  loop:
+    - regexp: '^  (# )*username = ".*"'
+      line: '  username = "{{ vault.tick.influx_accounts.telegraf_user }}"'
+    - regexp: '^  (# ) password = ".*"'
+      line: '  password = "{{ vault.tick.influx_accounts.telegraf_password }}"'
+  lineinfile:
+    path: /etc/telegraf/telegraf.conf
+    regexp: "{{ item.regexp }}"
+    line: "{{ item.line }}"
+  register: telegraf_update_conf
+
+- name: Restart Telegraf if config changed
+  when: telegraf_update_conf is changed
+  service:
+    name: telegraf
+    state: restarted

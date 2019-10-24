@@ -1,5 +1,10 @@
 - name: Ansible playbook to stand up TICK Stack server
-  host: tick
-  
-  tasks:
-    -
+  hosts: tick
+  gather_facts: false
+  become: true
+
+  vars_files:
+    - vault.yml
+ 
+  roles:
+    - tick 

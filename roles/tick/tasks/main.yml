@@ -1,0 +1,25 @@
+- name: Add the InfluxData repo to yum
+  copy:
+    dest: /etc/yum.repos.d/influxdata.repo
+    content: |
+      [influxdb]
+      name = InfluxData Repository - RHEL $releasever
+      baseurl = https://repos.influxdata.com/rhel/$releasever/$basearch/stable
+      enabled = 1
+      gpgcheck = 1
+      gpgkey = https://repos.influxdata.com/influxdb.key
+
+- name: Install InfluxDB
+  include: influxdb.yml
+  tags:
+    - influxdb
+
+- name: Install Telegraf
+  include: telegraf.yml
+  tags:
+    - telegraf
+
+- name: Install Kapacitor
+  include: kapacitor.yml
+  tags:
+    - kapacitor

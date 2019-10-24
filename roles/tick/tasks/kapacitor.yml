@@ -1,0 +1,29 @@
+- name: Install the Kapacitor package
+  yum:
+    name: kapacitor
+    state: present
+
+- name: Start the Kapacitor service
+  systemd:
+    name: kapacitor
+    daemon_reload: true # Always reload the daemon to pick up config changes
+    state: started
+
+- name: Configure Kapacitor to connect to InfluxDB
+  loop:
+    - option: username
+      value: "{{ vault.tick.influx_accounts.kapacitor_user }}"
+    - option: password
+      value: "{{ vault.tick.influx_accounts.kapacitor_password }}"
+  ini_file:
+    path: /etc/kapacitor/kapacitor.conf
+    section: '[influxdb]' # The module adds the second set of brackets
+    option: "  {{ item.option }}"
+    value: "\"{{ item.value }}\""
+  register: kapacitor_update_conf
+
+- name: Restart Kapacitor if the config changed
+  systemd:
+    name: kapacitor
+    daemon_reload: true
+    state: restarted

@@ -1,0 +1,36 @@
+- name: Install the InfluxDB package
+  yum:
+    name: influxdb
+    state: present
+
+- name: Start the InfluxDB service
+  service:
+    name: influxdb
+    state: started
+
+- name: Create the users in the database
+  loop:
+    - user: "{{ vault.tick.influx_accounts.admin_user }}"
+      password: "{{ vault.tick.influx_accounts.admin_password }}"
+    - user: "{{ vault.tick.influx_accounts.telegraf_user }}"
+      password: "{{ vault.tick.influx_accounts.telegraf_password }}"
+    - user: "{{ vault.tick.influx_accounts.kapacitor_user }}"
+      password: "{{ vault.tick.influx_accounts.kapacitor_password }}"
+  shell: >
+    influx -execute
+    "CREATE USER {{ item.user }}
+    WITH PASSWORD '{{ item.password }}'
+    WITH ALL PRIVILEGES"
+
+- name: Enable authentication for the http endpoint
+  lineinfile:
+    path: /etc/influxdb/influxdb.conf
+    regex: '^.*auth-enabled\\s*=\\s*.*$'
+    line: '  auth-enabled = true'
+  register: update_influxdb_conf
+
+- name: Restart influxdb if config was changed
+  when: update_influxdb_conf is changed
+  service:
+    name: influxdb
+    state: restarted
