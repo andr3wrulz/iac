@@ -4,10 +4,10 @@
     state: present
 
 - name: Start the Kapacitor service
-  systemd:
+  service:
     name: kapacitor
-    daemon_reload: true # Always reload the daemon to pick up config changes
     state: started
+    enabled: yes
 
 - name: Configure Kapacitor to connect to InfluxDB
   loop:
@@ -23,7 +23,8 @@
   register: kapacitor_update_conf
 
 - name: Restart Kapacitor if the config changed
+  when: kapacitor_update_conf is changed
   systemd:
     name: kapacitor
-    daemon_reload: true
+    daemon_reload: true # We need to reload the daemon with a config change
     state: restarted

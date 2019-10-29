@@ -1,3 +1,12 @@
+- name: Ensure required variables are set
+  assert:
+    that:
+      - vault.tick.influx_accounts.telegraf_user is defined
+      - vault.tick.influx_accounts.telegraf_password is defined
+      - vault.tick.telegraf.vcenter_host is defined
+      - vault.tick.telegraf.vcenter_user is defined
+      - vault.tick.telegraf.vcenter_password is defined
+
 - name: Install the Telegraf package
   yum:
     name: telegraf
@@ -7,19 +16,33 @@
   service:
     service: telegraf
     state: started
+    enabled: yes
 
-# Wish there was a better way to do this but because it is in ini-like
-# file with miles of commented out options, I couldn't think of anything.
-- name: Add the credentials for InfluxDB to the Telegraf config
+- name: Edit the telegraf config file
+  no_log: true
   loop:
-    - regexp: '^  (# )*username = ".*"'
-      line: '  username = "{{ vault.tick.influx_accounts.telegraf_user }}"'
-    - regexp: '^  (# ) password = ".*"'
-      line: '  password = "{{ vault.tick.influx_accounts.telegraf_password }}"'
-  lineinfile:
+    # Influx credentials
+    - section: "[outputs.influxdb]" # Module adds second set of brackets
+      option: username
+      value: "\"{{ vault.tick.influx_accounts.telegraf_user }}\""
+    - section: "[outputs.influxdb]"
+      option: password
+      value: "\"{{ vault.tick.influx_accounts.telegraf_password }}\""
+    # vSphere
+    - section: "[inputs.vsphere]"
+      option: vcenters
+      value: "[ \"{{ vault.tick.telegraf.vcenter_host }}\" ]"
+    - section: "[inputs.vsphere]"
+      option: username
+      value: "\"{{ vault.tick.telegraf.vcenter_user }}\""
+    - section: "[inputs.vsphere]"
+      option: password
+      value: "\"{{ vault.tick.telegraf.vcenter_password }}\""
+  ini_file:
     path: /etc/telegraf/telegraf.conf
-    regexp: "{{ item.regexp }}"
-    line: "{{ item.line }}"
+    section: "{{ item.section }}"
+    option: "  {{ item.option }}"
+    value: "  {{ item.value }}"
   register: telegraf_update_conf
 
 - name: Restart Telegraf if config changed

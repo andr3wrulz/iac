@@ -5,6 +5,23 @@
 
   vars_files:
     - vault.yml
+
+  pre_tasks:
+    - name: Ensure required variables are set
+      assert:
+        that:
+          # InfluxDB Accounts
+          - vault.tick.influx_accounts.admin_user is defined
+          - vault.tick.influx_accounts.admin_password is defined
+          - vault.tick.influx_accounts.telegraf_user is defined
+          - vault.tick.influx_accounts.telegraf_password is defined
+          - vault.tick.influx_accounts.kapacitor_user is defined
+          - vault.tick.influx_accounts.kapacitor_password is defined
+          - vault.tick.influx_accounts.chronograf_user is defined
+          - vault.tick.influx_accounts.chronograf_password is defined
+          # Chronograf's account for connecting to Kapacitor
+          - vault.tick.kapacitor.chronograf_user is defined
+          - vault.tick.kapacitor.chronograf_password is defined
  
   roles:
     - tick 

@@ -1,0 +1,24 @@
+- name: Download the Chronograf rpm
+  get_url:
+    url: https://dl.influxdata.com/chronograf/releases/chronograf-1.7.14.x86_64.rpm
+    dest: /tmp/chronograf.rpm
+
+- name: Install the downloaded rpm
+  shell: yum localinstall -y /tmp/chronograf.rpm
+  register: result
+  changed_when: "'Nothing to do' not in result.stdout"
+  failed_when: result.rc != 0
+
+- name: Ensure the Chronograf service is started
+  service:
+    name: chronograf
+    state: started
+    enabled: yes
+
+- name: Open the firewall port for the Chronograf UI
+  firewalld:
+    port: 8888/tcp
+    zone: public
+    state: enabled # Accept traffic
+    permanent: yes
+    immediate: yes
