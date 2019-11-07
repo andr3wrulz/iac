@@ -1,0 +1,106 @@
+- name: Ensure system is up to date
+  yum:
+    name: '*'
+    state: latest
+
+- name: Disable selinux
+  shell: setenforce 0
+  register: result
+  changed_when: result.rc == 0
+  failed_when: result.rc != 0 and "SELinux is disabled" not in result.stderr
+  
+- name: Disable selinux on subsequent boots
+  lineinfile:
+    path: /etc/sysconfig/selinux
+    regexp: '^SELINUX=.*$'
+    line: 'SELINUX=disabled'
+
+- name: Set firewall rules
+  loop:
+    - 6443/tcp
+    - 2379-2380/tcp
+    - 10250-10252/tcp
+    - 10255/tcp
+  firewalld:
+    state: enabled
+    permanent: yes
+    immediate: yes
+    port: "{{ item }}"
+
+- name: Enable br_netfilter (bridging for network adapters)
+  shell: modprobe br_netfilter
+
+- name: Enable bridging for iptables
+  shell: echo '1' > /proc/sys/net/bridge/bridge-nf-call-iptables
+
+- name: Turn off swapping
+  shell: swapoff -a
+
+- name: Make turning off swapping persistent on subsequent boots
+  lineinfile:
+    path: /etc/fstab
+    regexp: '^([^#].*?\sswap\s+sw\s+.*)$'
+    line: '# \1' # Just comment out the line
+
+- name: Install docker pre-reqs
+  yum:
+    state: present
+    name:
+      - yum-utils
+      - device-mapper-persistent-data
+      - lvm2
+
+- name: Add the docker repository
+  shell: yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+
+- name: Install docker
+  yum:
+    state: present
+    name:
+      - docker-ce
+  register: install_docker
+
+- name: Enable and start the docker daemon
+  service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Add the kubernetes repository
+  copy:
+    dest: /etc/yum.repos.d/kubernetes.repo
+    content: |
+      [kubernetes]
+      name=Kubernetes
+      baseurl=https://packages.cloud.google.com/yum/repos/kubernetes-el7-x86_64
+      enabled=1
+      gpgcheck=1
+      repo_gpgcheck=1
+      gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+             https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+
+- name: Install kubernetes packages
+  yum:
+    state: present
+    name:
+      - kubelet
+      - kubeadm
+      - kubectl
+  register: install_kubernetes
+
+- name: Start kublet service
+  service:
+    name: kubelet
+    state: started
+    enabled: true
+ 
+- name: Reboot the server and wait for it to come back
+  when: install_docker is changed or install_kubernetes is changed
+  reboot:
+
+
+- name: Create host entries for all k8s nodes in inventory
+  loop: "{{ groups['k8s-nodes'] }}"
+  lineinfile:
+    path: /etc/hosts
+    line: "{{ hostvars[item]['ansible_host'] }} {{ item }}"

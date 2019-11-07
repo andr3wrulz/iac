@@ -1,0 +1,46 @@
+- name: Setup servers to prep for kubernetes install
+  hosts: k8s-nodes
+  become: true
+  
+  vars_files:
+    - vault.yml
+
+  roles:
+    - k8s-common
+
+- name: Setup kubernetes on the master
+  hosts: k8s-masters
+  become: true
+
+  vars:
+    pod_network_cidr: 10.244.0.0/16 # Network range for pod ips
+
+  vars_files:
+    - vault.yml
+  
+  roles:
+    - k8s-master
+
+  tasks:
+    - name: Generate command to join k8s nodes to cluster
+      shell: kubeadm token create --print-join-command
+      register: join_command
+
+#    - name: Save the k8s cluster join command
+#      set_fact:
+#        join_command: "{{ join_command.stdout }}"
+
+- name: Join worker nodes to the cluster
+  hosts: k8s-workers
+  become: true
+
+  vars_files:
+    - vault.yml
+
+  tasks:
+    - name: (DEBUG) Print hostvars
+      debug:
+        var: hostvars[groups['k8s-masters'][0]]
+
+    - name: Join the worker to the cluster
+      shell: "{{ hostvars[groups['k8s-masters'][0]].join_command.stdout }}" 
